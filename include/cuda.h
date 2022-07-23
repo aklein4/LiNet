@@ -5,4 +5,6 @@ int time_ms();
 
 int add_vecs(float* a, float* b, float* c, int N, int R);
 
+void cuda_profile();
+
 #endif

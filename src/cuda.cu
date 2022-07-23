@@ -2,6 +2,13 @@
 #include "cuda.h"
 
 #include <chrono>
+#include <stdlib.h>
+#include <iostream>
+
+
+int NUMBER = 320*1000;
+int REPEAT = 10000;
+
 
 int time_ms() {
   using namespace std::chrono;
@@ -45,7 +52,7 @@ int add_vecs(float* a, float* b, float* c, int N, int R) {
         cuda_vecs<<<block_size, block_count>>>(d_a, d_b, d_c, N);
     }
     profile = time_ms() - profile;
-
+ 
     // get the results back
     cudaMemcpy(c, d_c, bytes, cudaMemcpyDeviceToHost);
 
@@ -55,4 +62,33 @@ int add_vecs(float* a, float* b, float* c, int N, int R) {
     cudaFree(d_c);
 
     return profile;
+}
+
+
+void cuda_profile() {
+    float* a = new float[NUMBER];
+    float* b = new float[NUMBER];
+    float* c = new float[NUMBER];
+
+    for (int i=0; i<NUMBER; i++) {
+        a[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        b[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        c[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    }
+
+    int profile = time_ms();
+    for (int i=0; i < REPEAT; i++) {
+        for (int n=0; n < NUMBER; n++) {
+            c[n] = a[n] + b[n];
+        }
+    }
+    profile = time_ms() - profile;
+    std::cout << "CPU Time: " << profile << " ms" << std::endl;
+
+    profile = add_vecs(a, b, c, NUMBER, REPEAT);
+    std::cout << "CUDA Time: " << profile << " ms" << std::endl;
+
+    delete[] a;
+    delete[] b;
+    delete[] c;
 }

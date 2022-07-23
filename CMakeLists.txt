@@ -11,6 +11,7 @@ file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_library(cuda ${cpu_source_files} ${gpu_source_files})
+set_property(TARGET cuda PROPERTY CUDA_ARCHITECTURES "86")
 
 add_executable(ChoiceNet "${CMAKE_SOURCE_DIR}/main.cpp")
 
