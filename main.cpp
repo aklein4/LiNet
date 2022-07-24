@@ -1,9 +1,13 @@
 
-#include "cuda.h"
-
+#include "choicenet.h"
+#include <vector>
+#include <iostream>
 
 int main() {
 
-    cuda_profile();
+    ChoiceNet net = ChoiceNet();
+    for (int i=0; i<10; i++) {
+        std::cout << net.update(1.0) << std::endl;
+    }
     
 }

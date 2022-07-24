@@ -1,31 +1,30 @@
 #ifndef NEURON_H
 #define NEURON_H
 
-typedef struct {
+#include <cmath>
+
+typedef struct dendrite {
 
     /* Dynamic Values */
-    float Y; // Value of the outgoing signal
-    float approx_plus; // upper approximation of dx/dp
-    float approx_minus; // lower approximation of dx/dp
+    float Y = static_cast<float>(0); // Value of the outgoing signal
+    float approx_plus = static_cast<float>(0); // upper approximation of dx/dp
+    float approx_minus = static_cast<float>(0); // lower approximation of dx/dp
 
     /* Control Theory-Based Values */
-    float p; // single pole of the transfer function. Should always be < 0.
-    float k; // gain of the transfer function
-    float p_plus; // higher pole of the dx/dp approximation
-    float p_minus; // lower pole of the dx/dp approximation
-    float approx_diff; // difference between p approximation poles and p
-    float approx_multi; // multiplier to scale dx/dp
+    float p = static_cast<float>(-1); // single pole of the transfer function. Should always be < 0.
+    float k = static_cast<float>(1); // gain of the transfer function
+    float p_plus = static_cast<float>(-0.99); // higher pole of the dx/dp approximation
+    float p_minus = static_cast<float>(-1.01); // lower pole of the dx/dp approximation
+    float approx_diff = static_cast<float>(0.01); // difference between p approximation poles and p
+    float approx_multi = static_cast<float>(50); // multiplier to scale dx/dp
 
     /* Static Computational Values */
-    float gamma; // "discounting coefficient" of transfer function. = e^p. Should always be in [0, 1)
-    float gamma_plus; // upper approximation of gamma
-    float gamma_minus; // lower approximation of gamma
+    float gamma = static_cast<float>(std::exp(-1)); // "discounting coefficient" of transfer function. = e^p. Should always be in [0, 1)
+    float gamma_plus = static_cast<float>(std::exp(-0.99)); // upper approximation of gamma
+    float gamma_minus = static_cast<float>(std::exp(-1.01)); // lower approximation of gamma
 
-    /* Pointers */
-    float* X; // pointer to the incoming signal
+} Dendrite;
 
-} dendrite;
-
-
+void update_dendrites(Dendrite* den, float X, int N);
 
 #endif
