@@ -27,6 +27,6 @@ Chunk::~Chunk() {
 }
 
 
-cudaError_t Chunk::forward_pass() {
-    
+int Chunk::forward_pass() {
+    return 0;
 }

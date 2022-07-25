@@ -1,0 +1,3 @@
+[submodule "extern/DimensionalCUDA"]
+	path = extern/DimensionalCUDA
+	url = https://github.com/aklein4/DimensionalCUDA.git

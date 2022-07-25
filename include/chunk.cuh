@@ -2,7 +2,7 @@
 #define CHUNK_H
 
 #include "neuron.h"
-#include "matrix.h"
+#include "dim_cuda.h"
 
 class Chunk {
     public:
@@ -18,7 +18,7 @@ class Chunk {
         /* Input and output buffers are deleted. Layer and Transfer matrices handle their own memory. */
         ~Chunk();
 
-        cudaError_t forward_pass();
+        int forward_pass();
 
     private:
         // dimensions
@@ -32,15 +32,15 @@ class Chunk {
         float* output_buffer_;
 
         // Contain the activation values of the internal layers
-        Matrix2D<float> activations_;
+        gpu::Matrix2D<float> activations_;
 
         // Contains the transfer functions between layers, square
         // transfers_[i] is the transfer matrix whose INPUT vector is activations_[i]
-        Matrix3D<Dendrite> transfers_;
+        gpu::Matrix3D<Dendrite> transfers_;
         // input and output may be different size from internal layers
         // may not be square
-        Matrix2D<Dendrite> input_transfer_;
-        Matrix2D<Dendrite> output_transfer_;
+        gpu::Matrix2D<Dendrite> input_transfer_;
+        gpu::Matrix2D<Dendrite> output_transfer_;
 };
 
 #endif

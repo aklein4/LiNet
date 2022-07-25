@@ -2,7 +2,7 @@
 #define CHOICENET_H
 
 #include "neuron.h"
-#include "chunk.h"
+#include "chunk.cuh"
 
 class ChoiceNet {
     public:
