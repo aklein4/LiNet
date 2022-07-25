@@ -18,6 +18,8 @@ class Chunk {
         /* Input and output buffers are deleted. Layer and Transfer matrices handle their own memory. */
         ~Chunk();
 
+        cudaError_t forward_pass();
+
     private:
         // dimensions
         size_t num_layers_;
