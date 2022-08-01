@@ -8,7 +8,7 @@ Chunk::Chunk(size_t num_layers, size_t layer_size, int input_size, int output_si
     input_buffer_(input_size < 0 ? layer_size : input_size),
     output_buffer_(output_size < 0 ? layer_size : output_size),
     // internal activations
-    activations_(layer_size, num_layers),
+    activations_(num_layers, layer_size),
     // transfer matrices
     transfers_(num_layers - 1, layer_size, layer_size),
     input_transfer_(layer_size, (input_size < 0 ? layer_size : input_size)),
@@ -57,20 +57,16 @@ void Chunk::read(float* buf) {
 
 
 void Chunk::forward_pass() {
-    // clear the buffers that are being read into
-    clear_matrix_(activations_);
-    clear_vector_(output_buffer_);
-
     // input to first activation
-    gpu::matMulti(input_transfer_, input_buffer_, activations_.col(0));
+    gpu::matMulti<Synapse, float, float>(input_transfer_, input_buffer_, activations_.vec(0), static_cast<float>(0.0));
 
     // internal activations
     for (int i=0; i < num_layers_-1; i++) {
-        gpu::matMulti(transfers_[i], activations_.col(i), activations_.col(i+1));
+        gpu::matMulti<Synapse, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1), static_cast<float>(0.0));
     }
 
     // last activation to output
-    gpu::matMulti(output_transfer_, activations_.col(num_layers_-1), output_buffer_);
+    gpu::matMulti<Synapse, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_, static_cast<float>(0.0));
 }
 
 /* Fill the buffer with zeroes. */
