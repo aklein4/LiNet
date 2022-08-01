@@ -1,8 +1,9 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 
-#include "neuron.h"
-#include "dim_cuda.h"
+#include "neuron.cuh"
+#include "gpu_types.cuh"
+#include "vector"
 
 class Chunk {
     public:
@@ -18,7 +19,16 @@ class Chunk {
         /* Input and output buffers are deleted. Layer and Transfer matrices handle their own memory. */
         ~Chunk();
 
-        int forward_pass();
+        // execute a forward pass through the network
+        void forward_pass();
+
+        /* Write the contents of the buffer into the input vector.
+         * \param[in] buf buffer to copy from. */
+        void write(float* buf);
+
+        /* Read the contents of the output vector into the buffer.
+         * \param[in] buf buffer to copy to. */
+        void read(float* buf);
 
     private:
         // dimensions
@@ -28,19 +38,24 @@ class Chunk {
         size_t output_size_;
 
         // data buffers that can be read/written for communication
-        float* input_buffer_;
-        float* output_buffer_;
+        gpu::Vector1D<float> input_buffer_;
+        gpu::Vector1D<float> output_buffer_;
 
         // Contain the activation values of the internal layers
         gpu::Matrix2D<float> activations_;
 
         // Contains the transfer functions between layers, square
         // transfers_[i] is the transfer matrix whose INPUT vector is activations_[i]
-        gpu::Matrix3D<Dendrite> transfers_;
+        gpu::Matrix3D<Synapse> transfers_;
         // input and output may be different size from internal layers
         // may not be square
-        gpu::Matrix2D<Dendrite> input_transfer_;
-        gpu::Matrix2D<Dendrite> output_transfer_;
+        gpu::Matrix2D<Synapse> input_transfer_;
+        gpu::Matrix2D<Synapse> output_transfer_;
+
+        /* fill a vector with all zeroes */
+        void clear_vector_(gpu::Vector1D<float> &vec);
+        /* fill a 2D matrix with all zeroes */
+        void clear_matrix_(gpu::Matrix2D<float> &mat);
 };
 
 #endif

@@ -1,8 +1,8 @@
 #ifndef CHOICENET_H
 #define CHOICENET_H
 
-#include "neuron.h"
-#include "chunk.cuh"
+#include "neuron.cuh"
+#include "chunk.h"
 
 class ChoiceNet {
     public:
@@ -12,7 +12,7 @@ class ChoiceNet {
         float update(float x_in);
 
     private:
-        Dendrite* gpu_d; 
+        Synapse* gpu_d; 
 };
 
 #endif

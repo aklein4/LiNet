@@ -1,32 +1,102 @@
 
-#include "chunk.cuh"
+#include "chunk.h"
+#include "gpu_types.cuh"
+#include "gpu_math.cuh"
 
 Chunk::Chunk(size_t num_layers, size_t layer_size, int input_size, int output_size):
-    // activation layers
-    activations_(num_layers, layer_size),
+    // io buffers
+    input_buffer_(input_size < 0 ? layer_size : input_size),
+    output_buffer_(output_size < 0 ? layer_size : output_size),
+    // internal activations
+    activations_(layer_size, num_layers),
     // transfer matrices
-    transfers_(num_layers, layer_size, layer_size),
+    transfers_(num_layers - 1, layer_size, layer_size),
     input_transfer_(layer_size, (input_size < 0 ? layer_size : input_size)),
     output_transfer_((output_size < 0 ? layer_size : output_size), layer_size)
     {
-    
+
     // dimensions
     num_layers_ = num_layers;
     layer_size_ = layer_size;
     input_size_ = (input_size < 0 ? layer_size_ : input_size);
     output_size_ = (output_size < 0 ? layer_size_ : output_size);
 
-    // io buffers
-    input_buffer_ = new float[input_size_];
-    output_buffer_ = new float[output_size_];
+    // set internal activation layers to all zero
+    clear_matrix_(activations_);
+
+    // initialize transfer functions with all default contructions
+    int coef = layer_size_;
+    if (input_size_ > coef) coef = input_size_;
+    if (output_size_ > coef) coef = output_size_;
+    int writer_size = num_layers_ * coef * coef;
+    Synapse* synapse_writer = new Synapse[writer_size];
+    for (int i=0; i<writer_size; i++) synapse_writer[i] = Synapse();
+
+    input_transfer_.write(synapse_writer);
+    output_transfer_.write(synapse_writer);
+    transfers_.write(synapse_writer);
+
+    delete[] synapse_writer;
 }
 
 Chunk::~Chunk() {
-    delete[] input_buffer_;
-    delete[] output_buffer_;
 }
 
 
-int Chunk::forward_pass() {
-    return 0;
+void Chunk::write(float* buf) {
+    assert(buf != NULL);
+
+    input_buffer_.write(buf);
+};
+
+void Chunk::read(float* buf) {
+    assert(buf != NULL);
+
+    output_buffer_.read(buf);
+};
+
+
+void Chunk::forward_pass() {
+    // clear the buffers that are being read into
+    clear_matrix_(activations_);
+    clear_vector_(output_buffer_);
+
+    // input to first activation
+    gpu::matMulti(input_transfer_, input_buffer_, activations_.col(0));
+
+    // internal activations
+    for (int i=0; i < num_layers_-1; i++) {
+        gpu::matMulti(transfers_[i], activations_.col(i), activations_.col(i+1));
+    }
+
+    // last activation to output
+    gpu::matMulti(output_transfer_, activations_.col(num_layers_-1), output_buffer_);
+}
+
+/* Fill the buffer with zeroes. */
+__global__ void gpu_clear_(float* buf, int size) {
+    int i = blockIdx.x + threadIdx.x;
+    if (i >= size) return;
+
+    buf[i] = 0.0;
+};
+void Chunk::clear_vector_(gpu::Vector1D<float> &vec) {
+    // get block array
+    int BLOCK_SIZE = 64;
+    int array_size = vec.size() / BLOCK_SIZE;
+    if (vec.size() % BLOCK_SIZE != 0) array_size ++;
+
+    // call the device-bound clearing function
+    gpu_clear_<<<array_size, BLOCK_SIZE>>>(vec.get_data(), vec.size());
+}
+void Chunk::clear_matrix_(gpu::Matrix2D<float> &mat) {
+    int size = mat.height() * mat.width();
+
+    // get block array
+    int BLOCK_SIZE = 16*16;
+    int array_size = size / BLOCK_SIZE;
+    if (size % BLOCK_SIZE != 0) array_size ++;
+
+    // call the device-bound clearing function
+    gpu_clear_<<<array_size, BLOCK_SIZE>>>(mat.get_data(), size);
 }
