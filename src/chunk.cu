@@ -58,15 +58,15 @@ void Chunk::read(float* buf) {
 
 void Chunk::forward_pass() {
     // input to first activation
-    gpu::matMulti<Synapse, float, float>(input_transfer_, input_buffer_, activations_.vec(0), static_cast<float>(0.0));
+    gpu::matMulti_opt<Synapse, float, float>(input_transfer_, input_buffer_, activations_.vec(0));
 
     // internal activations
     for (int i=0; i < num_layers_-1; i++) {
-        gpu::matMulti<Synapse, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1), static_cast<float>(0.0));
+        gpu::matMulti_opt<Synapse, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1));
     }
 
     // last activation to output
-    gpu::matMulti<Synapse, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_, static_cast<float>(0.0));
+    gpu::matMulti_opt<Synapse, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_);
 }
 
 /* Fill the buffer with zeroes. */

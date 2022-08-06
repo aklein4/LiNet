@@ -20,7 +20,7 @@ typedef struct synapse {
     float delta_t = static_cast<float>(0.01); // time step between convolution updates
 
     /* Static Computational Values */
-    float gamma = static_cast<float>(std::exp(-1 * 0.01)); // "discounting coefficient" of transfer function. = e^p. Should always be in [0, 1)
+    float gamma = static_cast<float>(std::exp(-1 * delta_t)); // "discounting coefficient" of transfer function. = e^p. Should always be in [0, 1)
     //float gamma_plus = static_cast<float>(std::exp(-0.99)); // upper approximation of gamma
     //float gamma_minus = static_cast<float>(std::exp(-1.01)); // lower approximation of gamma
 
