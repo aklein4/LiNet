@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-typedef struct synapse {
+typedef struct dendrite {
 
     /* Dynamic Values */
     float Y = static_cast<float>(0); // Value of the outgoing signal
@@ -24,10 +24,10 @@ typedef struct synapse {
     //float gamma_plus = static_cast<float>(std::exp(-0.99)); // upper approximation of gamma
     //float gamma_minus = static_cast<float>(std::exp(-1.01)); // lower approximation of gamma
 
-} Synapse;
+} Dendrite;
 
 /* execute a convolutional transfer function */
-inline __device__ __host__ float operator * (float X, Synapse& H) {
+inline __device__ __host__ float operator * (float X, Dendrite& H) {
     H.Y *= H.gamma;
     H.Y += X * H.k * H.delta_t;
     return H.Y;

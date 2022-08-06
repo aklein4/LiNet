@@ -12,7 +12,7 @@ class ChoiceNet {
         float update(float x_in);
 
     private:
-        Synapse* gpu_d; 
+        Dendrite* gpu_d; 
 };
 
 #endif

@@ -29,8 +29,8 @@ Chunk::Chunk(size_t num_layers, size_t layer_size, int input_size, int output_si
     if (input_size_ > coef) coef = input_size_;
     if (output_size_ > coef) coef = output_size_;
     int writer_size = num_layers_ * coef * coef;
-    Synapse* synapse_writer = new Synapse[writer_size];
-    for (int i=0; i<writer_size; i++) synapse_writer[i] = Synapse();
+    Dendrite* synapse_writer = new Dendrite[writer_size];
+    for (int i=0; i<writer_size; i++) synapse_writer[i] = Dendrite();
 
     input_transfer_.write(synapse_writer);
     output_transfer_.write(synapse_writer);
@@ -58,15 +58,15 @@ void Chunk::read(float* buf) {
 
 void Chunk::forward_pass() {
     // input to first activation
-    gpu::matMulti_opt<Synapse, float, float>(input_transfer_, input_buffer_, activations_.vec(0));
+    gpu::matMulti_opt<Dendrite, float, float>(input_transfer_, input_buffer_, activations_.vec(0));
 
     // internal activations
     for (int i=0; i < num_layers_-1; i++) {
-        gpu::matMulti_opt<Synapse, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1));
+        gpu::matMulti_opt<Dendrite, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1));
     }
 
     // last activation to output
-    gpu::matMulti_opt<Synapse, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_);
+    gpu::matMulti_opt<Dendrite, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_);
 }
 
 /* Fill the buffer with zeroes. */

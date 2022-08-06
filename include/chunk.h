@@ -46,11 +46,11 @@ class Chunk {
 
         // Contains the transfer functions between layers, square
         // transfers_[i] is the transfer matrix whose INPUT vector is activations_[i]
-        gpu::Matrix3D<Synapse> transfers_;
+        gpu::Matrix3D<Dendrite> transfers_;
         // input and output may be different size from internal layers
         // may not be square
-        gpu::Matrix2D<Synapse> input_transfer_;
-        gpu::Matrix2D<Synapse> output_transfer_;
+        gpu::Matrix2D<Dendrite> input_transfer_;
+        gpu::Matrix2D<Dendrite> output_transfer_;
 
         /* fill a vector with all zeroes */
         void clear_vector_(gpu::Vector1D<float> &vec);
