@@ -5,7 +5,7 @@
 #include <iostream>
 
 int main() {
-    size_t test_size = 1028;
+    size_t test_size = 1024;
 
     // create input buffer and write values to it
     float* in_buf = new float;
@@ -16,7 +16,7 @@ int main() {
     *out_buf = 0.0;
 
     // create a chunk
-    Chunk chunk(100, test_size, 1, 1);
+    Chunk chunk(10, test_size, 1, 1);
     chunk.write(in_buf);
 
     // update the chunk
