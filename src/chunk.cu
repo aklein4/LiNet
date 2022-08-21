@@ -3,10 +3,14 @@
 #include "gpu_types.cuh"
 #include "gpu_math.cuh"
 
+#include <iostream>
+
 Chunk::Chunk(size_t num_layers, size_t layer_size, int input_size, int output_size):
     // io buffers
     input_buffer_(input_size < 0 ? layer_size : input_size),
     output_buffer_(output_size < 0 ? layer_size : output_size),
+    reward_buffer_(output_size < 0 ? layer_size : output_size),
+    losses_(output_size < 0 ? layer_size : output_size),
     // internal activations
     activations_(num_layers, layer_size),
     // transfer matrices
@@ -19,6 +23,7 @@ Chunk::Chunk(size_t num_layers, size_t layer_size, int input_size, int output_si
     num_layers_ = num_layers;
     layer_size_ = layer_size;
     input_size_ = (input_size < 0 ? layer_size_ : input_size);
+    if (input_size_ % 32 != 0) std::cout << "ERROR: Chunk input size is not multiple of 32!" << std::endl;
     output_size_ = (output_size < 0 ? layer_size_ : output_size);
 
     // set internal activation layers to all zero
@@ -56,17 +61,34 @@ void Chunk::read(float* buf) {
 };
 
 
-void Chunk::forward_pass() {
+__global__ void calc_losses_(float* output, float* reward, float* loss) {
+    loss[threadIdx.x] = reward[threadIdx.x] - output[threadIdx.x];
+};
+void Chunk::reward(float* buf) {
+    assert(buf != NULL);
+
+    reward_buffer_.read(buf);
+    calc_losses_<<<1, output_size_>>>(output_buffer_.get_data(), reward_buffer_.get_data(), losses_.get_data());
+};
+
+
+
+void Chunk::forward() {
+
     // input to first activation
-    gpu::matMulti_opt<Dendrite, float, float>(input_transfer_, input_buffer_, activations_.vec(0));
+    gpu::matMulti<Dendrite, float, float>(input_transfer_, input_buffer_, activations_.vec(0), 0.0, false);
 
     // internal activations
     for (int i=0; i < num_layers_-1; i++) {
-        gpu::matMulti_opt<Dendrite, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1));
+        gpu::matMulti<Dendrite, float, float>(transfers_[i], activations_.vec(i), activations_.vec(i+1), 0.0, false);
     }
 
     // last activation to output
-    gpu::matMulti_opt<Dendrite, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_);
+    gpu::matMulti<Dendrite, float, float>(output_transfer_, activations_.vec(num_layers_-1), output_buffer_, 0.0, false);
+}
+
+void Chunk::backward() {
+    
 }
 
 /* Fill the buffer with zeroes. */

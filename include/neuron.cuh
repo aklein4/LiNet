@@ -10,10 +10,11 @@ typedef struct dendrite {
 
     /* Dynamic Values */
     float Y = static_cast<float>(0); // Value of the outgoing signal
+    float p = static_cast<float>(-1); // single pole of the transfer function. Should always be < 0.
+    
     float Y_offset = static_cast<float>(0); // Slightly offset value of the signal for calculating dp
 
     /* Control Theory-Based Values */
-    float p = static_cast<float>(-1); // single pole of the transfer function. Should always be < 0.
     float k = static_cast<float>(.125); // gain of the transfer function
     float delta_t = static_cast<float>(0.01); // time step between convolution updates
     float dp_offset = p * P_OFFSET;
@@ -44,15 +45,17 @@ typedef struct dendrite {
 } Dendrite;
 
 /* execute a convolutional transfer function */
-inline __device__ __host__ float operator * (float X, Dendrite& H) {
+inline __device__ __host__ float operator * (Dendrite& H, float X) {
+    //if (X <= 0.0) X = 0.0;
+
     H.Y *= H.gamma;
     H.Y += X * H.k * H.delta_t;
 
-    H.Y_offset *= H.gamma_offset;
-    H.Y_offset += X * H.k * H.delta_t;
+    //H.Y_offset *= H.gamma_offset;
+    //H.Y_offset += X * H.k * H.delta_t;
 
-    H.grad_x *= H.gamma;
-    if(X > 0.0) H.grad_x += H.delta_t; // ONLY WORKS FOR RELU ACTIVATION
+    //H.grad_x *= H.gamma;
+    //if(X > 0.0) H.grad_x += H.delta_t; // ONLY WORKS FOR RELU ACTIVATION
 
     return H.Y;
 };

@@ -20,7 +20,10 @@ class Chunk {
         ~Chunk();
 
         // execute a forward pass through the network
-        void forward_pass();
+        void forward();
+
+        // execute a backward pass through the network
+        void backward();
 
         /* Write the contents of the buffer into the input vector.
          * \param[in] buf buffer to copy from. */
@@ -29,6 +32,9 @@ class Chunk {
         /* Read the contents of the output vector into the buffer.
          * \param[in] buf buffer to copy to. */
         void read(float* buf);
+
+        // give the net the expected outcome from the previous step
+        void reward(float* buf);
 
     private:
         // dimensions
@@ -40,6 +46,8 @@ class Chunk {
         // data buffers that can be read/written for communication
         gpu::Vector1D<float> input_buffer_;
         gpu::Vector1D<float> output_buffer_;
+        gpu::Vector1D<float> reward_buffer_;
+        gpu::Vector1D<float> losses_;
 
         // Contain the activation values of the internal layers
         gpu::Matrix2D<float> activations_;
