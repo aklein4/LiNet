@@ -10,6 +10,11 @@ if(NOT DEFINED ${CMAKE_CUDA_ARCHITECTURES})
 endif()
 message(STATUS "CUDA architectures set to ${CMAKE_CUDA_ARCHITECTURES}")
 
+# I am speed
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
+
 # handle sub-libraries
 include(extern/DimensionalCUDA/CMakeLists.txt)
 
