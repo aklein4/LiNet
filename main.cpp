@@ -5,18 +5,18 @@
 #include <iostream>
 
 int main() {
-    size_t test_size = 1024;
+    size_t test_size = 256;
 
     // create input buffer and write values to it
-    float* in_buf = new float[1024];
-    for (int i=0; i<1024; i++) in_buf[i] = 0.0;
+    float* in_buf = new float[32];
+    for (int i=0; i<32; i++) in_buf[i] = 0.0;
 
     // create another buffer to read output into
-    float* out_buf = new float[1024];
+    float* out_buf = new float[32];
     *out_buf = 0.0;
 
     // create a chunk
-    Chunk chunk(10, test_size);
+    Chunk chunk(4, test_size, 32, 32);
     chunk.write(in_buf);
 
     // update the chunk

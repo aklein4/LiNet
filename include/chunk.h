@@ -1,7 +1,7 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 
-#include "neuron.cuh"
+#include "neuron.h"
 #include "gpu_types.cuh"
 #include "vector"
 

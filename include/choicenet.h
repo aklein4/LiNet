@@ -1,7 +1,7 @@
 #ifndef CHOICENET_H
 #define CHOICENET_H
 
-#include "neuron.cuh"
+#include "neuron.h"
 #include "chunk.h"
 
 class ChoiceNet {

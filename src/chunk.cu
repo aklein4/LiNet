@@ -2,6 +2,7 @@
 #include "chunk.h"
 #include "gpu_types.cuh"
 #include "gpu_math.cuh"
+#include "neuron_math.cuh"
 
 #include <iostream>
 
