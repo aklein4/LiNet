@@ -1,5 +1,4 @@
 
-from tracemalloc import start
 import ordinet
 
 import torch
@@ -8,17 +7,20 @@ import matplotlib.pyplot as plt
 import time
 
 NUM_STEPS = 60
-LAYER_SIZE = 512
+LAYER_SIZE = 1024
 NUM_RECORD = 16
 NUM_HIDDEN = 8
 
 def main(args):
-    net = ordinet.Ordinet(LAYER_SIZE, NUM_HIDDEN)
+    device = torch.device("cpu")
+    if args.cuda:
+        device = torch.device('cuda:0')
+    net = ordinet.Ordinet(LAYER_SIZE, NUM_HIDDEN, device=device)
 
     outputs = []
 
-    x_on = torch.full([net.layer_size], 1.0)
-    x_off = torch.zeros([net.layer_size])
+    x_on = torch.full([net.layer_size], 1.0, device=device)
+    x_off = torch.zeros([net.layer_size], device=device)
 
     start_time = time.time_ns()
     for i in range(NUM_STEPS):

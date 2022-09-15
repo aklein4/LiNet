@@ -8,7 +8,7 @@ ACT_FUNCS = {
     "relu": torch.nn.ReLU(inplace=True)
 }
 
-INTEGRATOR_LIMIT = -0.05
+INTEGRATOR_LIMIT = -0.02
 DEFAULT_MAX_TAU = 6
 
 class Ordinet:
@@ -47,7 +47,6 @@ class Ordinet:
         # whether the last activation should have an activation function
         self.last_activates = last_activates # TODO: Put this in backward pass
 
-
     def _init_layer(self, gains, gammas, index):
         # mutate gain and gamma values
 
@@ -60,7 +59,7 @@ class Ordinet:
 
         # He initialization on integral and gain
         integrals = torch.normal(0.0, math.sqrt(2/n_inputs), matrix_size, dtype=self.dtype, device=self.device)
-        gains[index] = torch.normal(0.0, math.sqrt(2/n_inputs), matrix_size, dtype=self.dtype, device=self.device)
+        gains[index] = torch.normal(0.0, math.sqrt(1/n_inputs), matrix_size, dtype=self.dtype, device=self.device) # 1 seems to work better for 60fps
 
         # select pole to give the integral
         poles = torch.div(gains[index], integrals)
