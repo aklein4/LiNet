@@ -2,3 +2,4 @@
 # build directory
 build/
 .vscode/settings.json
+py/__pycache__/ordinet.cpython-38.pyc
