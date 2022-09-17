@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import time
 
 NUM_STEPS = 60
-LAYER_SIZE = 8
+LAYER_SIZE = 512
 NUM_RECORD = 16
-NUM_HIDDEN = 2
+NUM_HIDDEN = 8
 
 def main(args):
 
@@ -27,6 +27,7 @@ def main(args):
 
     inputs = []
     outputs = []
+    loss_outputs = []
 
     x_on = torch.full([net.layer_size], 1.0, device=device)
     x_off = torch.zeros([net.layer_size], device=device)
@@ -41,17 +42,20 @@ def main(args):
             y = net.forward(x_off)
             inputs.append(x_off)
         
-        #outputs.append(y.tolist()[:NUM_RECORD])
-        outputs.append(y)
-    print("Time:", round((time.time_ns()-start_time)/1000000, 2))
+        outputs.append(y.tolist()[:min(NUM_RECORD, LAYER_SIZE)])
+        loss_outputs.append(y)
+    print("Forward Time:", round((time.time_ns()-start_time)/1000000, 2))
 
     input_seq = torch.stack(inputs)
-    output_seq = torch.stack(outputs)
+    output_seq = torch.stack(inputs)
     
+    start_time = time.time_ns()
     net.backward(input_seq, output_seq)
+    print("Backward Time:", round((time.time_ns()-start_time)/1000000, 2))
 
-    plt.plot([[i for _ in range(NUM_RECORD)] for i in range(NUM_STEPS)], outputs)
+    plt.plot([[i for _ in range(min(NUM_RECORD, LAYER_SIZE))] for i in range(NUM_STEPS)], outputs)
     plt.savefig('output.png')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Python-based choicenet')
