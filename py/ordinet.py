@@ -20,13 +20,12 @@ ACT_FUNCS = {
     "relu": torch.nn.ReLU(inplace=True)
 }
 DIFF_FUNCS = {
-    "relu": lambda t: torch.where(torch.gt(t, 0), 1, 0)
+    "relu": lambda t: torch.where(t.gt(0), 1, 0)
 }
 
-MAX_SETTLING_TIME = 90
+MAX_SETTLING_TIME = 15
 DEFAULT_MAX_TAU = 6
 INTEGRATOR_LIMIT = -(1/(MAX_SETTLING_TIME/DEFAULT_MAX_TAU))
-ROUNDING_DIGITS = 3
 
 def indw(A, i):
     # evaluate A at wrapped index i
@@ -92,6 +91,7 @@ class Ordinet:
         # whether the last activation should have an activation function
         self.last_activates = last_activates # TODO: Put this in backward pass
 
+
     def _init_layer(self, gains, gammas, index):
         # mutate gain and gamma values
 
@@ -118,6 +118,8 @@ class Ordinet:
 
         # convert the poles to gammas
         gammas[index] = torch.exp(poles)
+        gammas[index] = torch.where(gammas[index].le(0.00001), 0.00001, gammas[index])
+
 
     def forward(self, phi: torch.Tensor):
         if phi.dim() != 1:
@@ -181,25 +183,35 @@ class Ordinet:
         # offset per-transfer values for calculating pole gradients
         offset_activations = torch.zeros(self.container_size, dtype=self.dtype, device=self.device)
 
-        # keep track of the backwards loss dependencies
-        loss_convolutions = torch.zeros(self.container_size, dtype=self.dtype, device=self.device)
-
 
         # find the maximum forward-search depth
         max_depth = math.floor((-1/INTEGRATOR_LIMIT) * max_tau)
 
-        # find the forward-search depth of each transfer ()
-        search_indexes = torch.floor(max_tau*torch.div(torch.full(self.container_size, 1.0, dtype=self.dtype, device=self.device), -1*poles))
-        search_indexes = search_indexes.type(dtype=torch.int32)
-
+        # find how long it takes for every transfer to decay
+        decay_times = torch.floor(max_tau*torch.div(torch.full(self.container_size, 1.0, dtype=self.dtype, device=self.device), -1*poles))
+        decay_times = decay_times.type(dtype=torch.int32)
         # find the maximum decay level at the given transfer search depth
-        max_decays = torch.exp(torch.mul(poles, search_indexes))
+        max_decays = torch.exp(torch.mul(poles, decay_times))
 
+        # find the forward-search depth of each transfer ()
+        search_indexes = decay_times.clone()
         # search indexes must have the correct row offset for reshaped indexing
         for l in range(search_indexes.size(dim=0)):
             search_indexes[l] *= search_indexes[l].size(dim=0)
             temp_search = search_indexes[l].reshape([search_indexes[l].nelement()])
             temp_search += torch.concat([torch.full([search_indexes[l].size(dim=1)], i, device=self.device) for i in range(search_indexes[l].size(dim=0))])
+
+
+        # keep track of the backwards loss dependencies
+        loss_convolutions = torch.zeros([self.container_size[0], 2, self.container_size[1], self.container_size[2]], dtype=self.dtype, device=self.device)
+        # keep track of which loss convolution is on top
+        loss_convolution_coeffs = torch.stack([
+            torch.zeros(self.container_size, dtype=torch.int32, device=self.device),
+            torch.full(self.container_size, 1.0, dtype=torch.int32, device=self.device)
+        ], dim=1)
+        # keep track of when to switch the loss convolution index
+        loss_convolution_tracker = decay_times.clone()
+
 
         # the distance between the trailing layer and leading layer at the index
         tail_lengths = [k * max_depth for k in range(self.container_size[0], 0, -1)]
@@ -222,17 +234,22 @@ class Ordinet:
             torch.zeros([max(tail_lengths) + max_depth, loss_gradients.size(dim=1)], dtype=self.dtype, device=self.device)
         ])
 
-        # print(" --- search dist --- ")
-        # print(torch.floor(max_tau*torch.div(torch.full(self.container_size, 1.0, dtype=self.dtype, device=self.device), -1*poles)[self.container_size[0]-1]))
-        # print(" --- max decays ---")
-        # print(max_decays[self.container_size[0]-1])
-        # print(" --- gammas ---")
-        # print(self.gammas[self.container_size[0]-1])
+        print(" --- search dist --- ")
+        print(torch.floor(max_tau*torch.div(torch.full(self.container_size, 1.0, dtype=self.dtype, device=self.device), -1*poles)[self.container_size[0]-2]))
+        print(" --- max decays ---")
+        print(max_decays[self.container_size[0]-2])
+        print(" --- gammas ---")
+        print(self.gammas[self.container_size[0]-2])
+        print(" --- gains ---")
+        print(self.gains[self.container_size[0]-2])
+
+        self_grad_time = 0.0
+        convolve_grad_time = 0.0
+        leader_time = 0.0
+        timer = Timer()
 
         """ Iterate forward through the data sequence """
         for t in range(sequence_length + max(tail_lengths)):
-
-            # print(" -------------- ")
 
             # backpropogate the loss
             for l in range(self.container_size[0]):
@@ -244,7 +261,6 @@ class Ordinet:
                     curr_loss = indp(loss_gradients, t - max_depth)
                 else:
                     curr_loss = indw(loss_trails[l+1], t)      
-                curr_loss = torch.round(curr_loss * 10**ROUNDING_DIGITS) / 10**ROUNDING_DIGITS
 
                 # get the input to the transfer here
                 my_input = None
@@ -257,6 +273,9 @@ class Ordinet:
                 """ First we take care of the transfer function's current gradient """
 
                 if t - tail_lengths[l] >= 0 and t - tail_lengths[l] < sequence_length:
+
+                    # only if we are within the working range
+
                     multed_input = torch.mul(self.gains[l], torch.t(my_input))
                     # convolve on the regular activations
                     trailing_activations[l] = torch.mul(trailing_activations[l], self.gammas[l])
@@ -265,8 +284,14 @@ class Ordinet:
                     offset_activations[l] = torch.mul(offset_activations[l], offset_gammas[l])
                     offset_activations[l] = torch.add(offset_activations[l], multed_input)
 
+                    # if l == self.container_size[0]-3:
+                    #      print(" --- curr loss:")
+                    #      print(curr_loss)
+                    #      print(" --- loss convs:")
+                    #      print(trailing_activations[l])
+
                     # update the gradients with chain rule
-                    self.gain_grads[l] += torch.mul(torch.divide(trailing_activations[l], self.gains[l]), torch.t(curr_loss))
+                    self.gain_grads[l] += torch.mul(torch.divide(trailing_activations[l], self.gains[l]), curr_loss)
                     self.pole_grads[l] += torch.mul(torch.div(torch.sub(offset_activations[l], trailing_activations[l]), offset_coefs[l]), torch.t(curr_loss))
 
                 """ Second we update and save the transfer function's loss convolution """
@@ -289,33 +314,61 @@ class Ordinet:
                         reshaped_search = search_locations.reshape([search_locations.nelement()]) # turn the search tensor to 1D
                         new_loss = torch.index_select(padded_loss.reshape(padded_loss.nelement()), 0, reshaped_search).reshape(search_indexes[l].shape) # get the loss at the index and convert back to shape
 
-                    # if l == self.container_size[0]-1:
-                    #     print(" --- new loss:")
-                    #     print(new_loss)
+                    # if l == self.container_size[0]-2:
+                    #     print("\n ----- \n")
+                    #     print(" --- loss trail:")
+                    #     print(loss_trails[l+1])
 
                     # add this new loss to the loss convolutions
-                    loss_convolutions[l] += torch.mul(max_decays[l], new_loss)
-
-                    # if l == self.container_size[0]-1:
-                    #     print(" --- first convolution:")
-                    #     print(loss_convolutions[l])
+                    multed_new_loss = torch.mul(max_decays[l], new_loss)
+                    loss_convolutions[l][0] += torch.mul(loss_convolution_coeffs[l][0], multed_new_loss)
+                    loss_convolutions[l][1] += torch.mul(loss_convolution_coeffs[l][1], multed_new_loss)
 
                     # sum up the loss convolutions into the input, account for the input gradient, then save it
-                    saving_loss = torch.mul(loss_convolutions[l], self.gains[l]) # don't forget the gains
+                    saving_loss = torch.mul(loss_convolutions[l][0] + loss_convolutions[l][1], self.gains[l]) # don't forget the gains
+
+                    # if l == self.container_size[0]-1:
+                    #     print(" --- loss convs:")
+                    #     print(saving_loss)
+
+                    if l == 2:
+                        print("before")
+                        print(loss_convolutions[l])
+
                     saving_loss = torch.sum(saving_loss, dim=0)
                     saving_loss = torch.mul(saving_loss, self.act_grad_func(my_input))
                     loss_trails[l][indw_i(loss_trails[l], t)] = saving_loss
 
                     # remove the backward convolve the loss convolutions to prepare for next
-                    loss_convolutions[l] -= curr_loss
-                    # if l == self.container_size[0]-1:
-                    #     print(" --- subtracted convolution:")
-                    #     print(loss_convolutions[l])
-                    loss_convolutions[l] = torch.div(loss_convolutions[l], self.gammas[l])
-                    # if l == self.container_size[0]-1:
-                    #     print(" --- multiplied convolution:")
-                    #     print(loss_convolutions[l])
-                    #     sys.stdout.flush()
+                    loss_convolutions[l][0] -= torch.mul(loss_convolution_coeffs[l][1], curr_loss)
+                    loss_convolutions[l][1] -= torch.mul(loss_convolution_coeffs[l][0], curr_loss)
+
+                    loss_convolution_tracker[l] -= 1
+                    loss_must_clear = loss_convolution_tracker[l].eq(0)
+                    loss_convolution_tracker[l] = torch.where(loss_must_clear, decay_times[l], loss_convolution_tracker[l])
+                    loss_convolutions[l][0] = torch.where(torch.logical_and(loss_must_clear, loss_convolution_coeffs[l][0].le(0.5)), 0, loss_convolutions[l][0])
+                    loss_convolutions[l][1] = torch.where(torch.logical_and(loss_must_clear, loss_convolution_coeffs[l][1].le(0.5)), 0, loss_convolutions[l][1])
+
+                    temp = loss_convolution_coeffs[l][0].clone()
+                    loss_convolution_coeffs[l][0] = torch.where(loss_must_clear, loss_convolution_coeffs[l][1], loss_convolution_coeffs[l][0])
+                    loss_convolution_coeffs[l][1] = torch.where(loss_must_clear, temp, loss_convolution_coeffs[l][1])
+
+                    if l == 2:
+                        print("subbed")
+                        print(loss_convolutions[l])
+
+                    # remove the backward convolve the loss convolutions to prepare for next
+                    loss_convolutions[l][0] = torch.div(loss_convolutions[l][0], self.gammas[l])
+                    loss_convolutions[l][1] = torch.div(loss_convolutions[l][1], self.gammas[l])
+
+                    if l == 2:
+                        print("Final")
+                        print(loss_convolutions[l])
+
+                # otherwise we just put zero
+                elif l > 0:
+                    loss_trails[l][indw_i(loss_trails[l], t)] = torch.zeros(loss_trails[l][indw_i(loss_trails[l], t)].size(), dtype=self.dtype, device=self.device)
+
 
             # do the leading forward pass (only if font is within data sequence)
             if t < sequence_length:
@@ -336,3 +389,4 @@ class Ordinet:
 
                         # this should always evaluate to a hidden layer, so save the input to the trail
                         input_trails[b+1][indw_i(input_trails[b+1], t)] = input_leader.clone() # overwrites the last input that was read
+                        
