@@ -9,9 +9,9 @@ import math
 import sys
 
 NUM_STEPS = 20
-LAYER_SIZE = 64
+LAYER_SIZE = 1028
 NUM_RECORD = 1
-NUM_HIDDEN = 2
+NUM_HIDDEN = 8
 
 def main(args):
 
@@ -25,7 +25,7 @@ def main(args):
         device = torch.device('cuda:0')
     
     # init the net
-    net = ordinet.Ordinet(LAYER_SIZE, NUM_HIDDEN, device=device, last_activates=False, act_func='relu')
+    net = ordinet.Ordinet(LAYER_SIZE, NUM_HIDDEN, device=device, last_activates=False, act_func='elu')
 
     x_on = torch.full([net.layer_size], 1.0, device=device)
     x_off = torch.zeros([net.layer_size], device=device)
@@ -39,7 +39,7 @@ def main(args):
         outputs = []
         loss_outputs = []
 
-        start_time = time.time_ns()
+        #start_time = time.time_ns()
         for i in range(NUM_STEPS):
             y = None
             if i == 0:
@@ -57,21 +57,21 @@ def main(args):
         #print("Forward Time:", round((time.time_ns()-start_time)/1000000, 2))
 
         input_seq = torch.stack(inputs)
-        output_seq = torch.stack(loss_outputs)
+        loss_seq = torch.stack(loss_outputs)
         
-        start_time = time.time_ns()
-        net.backward(input_seq, output_seq)
+        #start_time = time.time_ns()
+        net.backward(input_seq, loss_seq)
         #print("Backward Time:", round((time.time_ns()-start_time)/1000000, 2))
 
-        loss = torch.sum(torch.square(output_seq)).item()
-        if epoch % 2 == 0:
-            print("Loss:", loss)
+        loss = torch.sum(torch.square(loss_seq)).item() / loss_seq.size(dim=0)
+        if epoch % 1 == 0:
+            print("Epoch:", epoch, "| Loss:", loss, "| max_dk:", torch.max(net.gain_grads).item(), "| max_dp:", torch.max(net.pole_grads).item())
             plt.cla()
             plt.plot([[i for _ in range(min(NUM_RECORD, LAYER_SIZE))] for i in range(NUM_STEPS)], outputs)
             plt.plot([[i for _ in range(min(NUM_RECORD, LAYER_SIZE))] for i in range(NUM_STEPS)], target, 'k--')
             plt.savefig('output.png')
-
-        net.apply_grads(0.001)
+        
+        net.apply_grads(1e-7, 1e-7)
 
 
 if __name__ == '__main__':
