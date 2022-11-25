@@ -1,17 +1,55 @@
 
-import ordinet
+import linet
+from train import DataLoader, train
 
 import torch
 import argparse
 import matplotlib.pyplot as plt
-import time
-import math
-import sys
 
-NUM_STEPS = 20
-LAYER_SIZE = 1028
-NUM_RECORD = 1
-NUM_HIDDEN = 8
+import numpy as np
+import numpy.polynomial as poly
+
+
+NUM_STEPS = 64
+LAYER_SIZE = 64
+NUM_HIDDEN = 4
+
+N_TRAIN = 64
+N_VAL = 16
+
+
+def get_random_poly(device):
+    """
+    Get a randomly generated polynomial time series tensor.
+    """
+    poly_tensor = torch.zeros((NUM_STEPS, LAYER_SIZE), device=device)
+    p = poly.Polynomial(np.random.randint([-5*NUM_STEPS**2, -5*NUM_STEPS, -5], [5*NUM_STEPS**2, 5*NUM_STEPS, 5], size=(3,)))
+    for t in range(NUM_STEPS):
+        poly_tensor[t][:] = p(t)
+
+    poly_tensor /= 5*NUM_STEPS**2
+    poly_tensor -= min(0, torch.min(poly_tensor).item())
+
+    return poly_tensor
+
+def get_random_sin(device):
+    """
+    Get a randomly generated sinusoid time series tensor.
+    """
+    sin_tensor = torch.zeros((NUM_STEPS, LAYER_SIZE), device=device)
+    
+    w = np.random.random() + 0.025
+    phi = np.random.random() * 2*np.pi
+    A = 5 * (2*np.random.random()-1) * NUM_STEPS**2
+    
+    for t in range(NUM_STEPS):
+        sin_tensor[t][:] = A*np.sin(w*t + phi)
+
+    sin_tensor /= 5*NUM_STEPS**2
+    sin_tensor -= min(0, torch.min(sin_tensor).item())
+    
+    return sin_tensor
+
 
 def main(args):
 
@@ -25,55 +63,47 @@ def main(args):
         device = torch.device('cuda:0')
     
     # init the net
-    net = ordinet.Ordinet(LAYER_SIZE, NUM_HIDDEN, device=device, last_activates=False, act_func='elu')
+    net = linet.LiNet(LAYER_SIZE, NUM_HIDDEN, device=device, last_activates=False, act_func='elu')
+    
+    # create data to use
+    train_poly = []
+    train_sin = []
+    val_poly = []
+    val_sin = []
 
-    x_on = torch.full([net.layer_size], 1.0, device=device)
-    x_off = torch.zeros([net.layer_size], device=device)
+    for n in range(N_TRAIN):
+        train_poly.append(get_random_poly(device))
+        train_sin.append(get_random_sin(device))
+    for n in range(N_VAL):
+        val_poly.append(get_random_poly(device))
+        val_sin.append(get_random_sin(device))
 
-    target = []
-    for i in range(NUM_STEPS):
-        target.append([math.sin(i * math.pi/20)])
+    for poly in val_poly:
+        plt.plot(range(poly.shape[0]), poly[:, 0].cpu())
+    plt.title("Polynomial Validation Functions")
+    plt.savefig("ply_val.png")
 
-    for epoch in range(10000):
-        inputs = []
-        outputs = []
-        loss_outputs = []
+    plt.clf()
+    for sin in val_sin:
+        plt.plot(range(sin.shape[0]), sin[:, 0].cpu())
+    plt.title("Sinusoid Validation Functions")
+    plt.savefig("sin_val.png")
 
-        #start_time = time.time_ns()
-        for i in range(NUM_STEPS):
-            y = None
-            if i == 0:
-                y = net.forward(x_on)
-                inputs.append(x_on)
-            else:
-                y = net.forward(x_off)
-                inputs.append(x_off)
-            
-            outputs.append(y.tolist()[:min(NUM_RECORD, LAYER_SIZE)])
-            loss_grad = torch.zeros_like(y)
-            loss_grad[0] = (math.sin(i * math.pi/20) - y[0])
-            loss_outputs.append(loss_grad)
-        net.reset()
-        #print("Forward Time:", round((time.time_ns()-start_time)/1000000, 2))
+    train_data = DataLoader(
+        train_poly + train_sin,
+        [0 for _ in range(len(train_poly))] + [1 for _ in range(len(train_sin))]
+    )
+    val_data = DataLoader(
+        val_poly + val_sin,
+        [0 for _ in range(len(val_poly))] + [1 for _ in range(len(val_sin))]
+    )
 
-        input_seq = torch.stack(inputs)
-        loss_seq = torch.stack(loss_outputs)
+    train(
+        net, training_data=train_data, validation_data=val_data,
+        learning_rate=1e-3, batch_size=32, plot=True, checkpoint_freq=10,
+        shuffle=True, classifier=True
+    )
         
-        #start_time = time.time_ns()
-        net.backward(input_seq, loss_seq)
-        #print("Backward Time:", round((time.time_ns()-start_time)/1000000, 2))
-
-        loss = torch.sum(torch.square(loss_seq)).item() / loss_seq.size(dim=0)
-        if epoch % 1 == 0:
-            print("Epoch:", epoch, "| Loss:", loss, "| max_dk:", torch.max(net.gain_grads).item(), "| max_dp:", torch.max(net.pole_grads).item())
-            plt.cla()
-            plt.plot([[i for _ in range(min(NUM_RECORD, LAYER_SIZE))] for i in range(NUM_STEPS)], outputs)
-            plt.plot([[i for _ in range(min(NUM_RECORD, LAYER_SIZE))] for i in range(NUM_STEPS)], target, 'k--')
-            plt.savefig('output.png')
-        
-        net.apply_grads(1e-7, 1e-7)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Python-based choicenet')
 
