@@ -7,7 +7,7 @@ import torch
 # maximum number of steps before an impulse must decay
 MAX_SETTLING_TIME = 128
 # maximum number of time-constants that are treated as full decay
-DEFAULT_MAX_TAU = 6
+DEFAULT_MAX_TAU = 4
 # the maxmimum pole location based on MAX_SETTLING_TIME and DEFAULT_MAX_TAU
 INTEGRATOR_LIMIT = -(1/(MAX_SETTLING_TIME/DEFAULT_MAX_TAU))
 # The maximum gradient that can be applied to avoid divergence

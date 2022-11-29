@@ -96,7 +96,7 @@ def train(net: linet.LiNet, num_epochs: int=-1, training_data: DataLoader=None, 
 
                 last_grad = last_layer_diff(out)
                 loss_grads = torch.zeros_like(batch_x[i])
-                loss_grads[-1][0] = -last_grad*(batch_y[i] - pred)
+                loss_grads[-1][0] = last_grad*(batch_y[i] - pred)
                 net.backward(batch_x[i], loss_grads)
 
                 done += 1

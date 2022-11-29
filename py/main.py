@@ -29,6 +29,7 @@ def get_random_poly(device):
 
     poly_tensor /= 5*NUM_STEPS**2
     poly_tensor -= min(0, torch.min(poly_tensor).item())
+    poly_tensor /= max(1, torch.max(poly_tensor).item())
 
     return poly_tensor
 
@@ -40,12 +41,11 @@ def get_random_sin(device):
     
     w = np.random.random() + 0.025
     phi = np.random.random() * 2*np.pi
-    A = 5 * (2*np.random.random()-1) * NUM_STEPS**2
+    A = np.random.random() / 2
     
     for t in range(NUM_STEPS):
         sin_tensor[t][:] = A*np.sin(w*t + phi)
 
-    sin_tensor /= 5*NUM_STEPS**2
     sin_tensor -= min(0, torch.min(sin_tensor).item())
     
     return sin_tensor
@@ -100,7 +100,7 @@ def main(args):
 
     train(
         net, training_data=train_data, validation_data=val_data,
-        learning_rate=1e-3, batch_size=32, plot=True, checkpoint_freq=10,
+        learning_rate=1e-1, batch_size=1, plot=True, checkpoint_freq=10,
         shuffle=True, classifier=True
     )
         
