@@ -8,7 +8,7 @@ The CUDA/C++ optimized version of the network is still a work in progress, so al
 
 ### linet.py
 
-Defines the LiNet class and contains teh methods for forward and backwards propogation, as well as other useful methods and information.
+Defines the LiNet class and contains the methods for forward and backwards propogation, as well as other useful methods and information.
 
 ### linet_helpers.py
 
@@ -28,7 +28,7 @@ Using a network with the following parameters:
  - num_hidden = 4
  - num_steps = 64
  - default constants seen in linet.py
- - elu activation function
+ - ELU activation function
 
 and training/data with the following parameters:
  - num_steps = 64
@@ -69,7 +69,7 @@ Linear transfer functions are come from the field of control theory, and are abs
 
 The single-pole transfer function is the solution to the dynamics equation x' + ax = F. Systems described by this equation include the charge of a transistor with relation to voltage, and the velocity of an object moving with viscous friction with relation to driving force.
 
-Represented in the s-domain as k/(s-p), the single-pole transfer function represents the convolution of the input signal (often a force or a voltage, but in our case the input to a layer) with an exponential decay response function. It can be shown that through linear combinations of single-poly transfer functions, any arbitrary response function can be achieved. 
+Represented in the s-domain as k/(s-p), the single-pole transfer function represents the convolution of the input signal (often a force or a voltage, but in our case the input to a layer) with an exponential decay response function. It can be shown that through linear combinations of single-pole transfer functions, any arbitrary response function can be achieved. 
 
 Example response function:
 ![example of an exponential decary response function](./example_images/impulse_response.jpg)
@@ -84,6 +84,11 @@ Output:
 
 ![example output signal](./example_images/output_signal.png)
 
-With respect to deep learning, transfer functions are more computationally efficient than kernel-based approaches, as the next state of a transfer function can be found using one multiply-accumulate: y(t) = k*exp(p)*y(t-1) + x(t), where k*exp(p) must only be computed once. Furthermore, since previous inputs are stored in superposition, only the current state of the network must be stored during inference - that is, we don't need to store previous states to re-convolve over them. This mean that LiNet has the exact same time and space inference complexity as a regular feed-forward network.
+The way that LiNet uses these transfer functions is to replace the regular weight matrix with a matrix of linear transfer functions. In the current PyTorch implementation, this requires three seperate matrices: the gain of each function, the decay value (specifically, exp(p) of the function, called gamma in the code), and the state of the function. The output to the next layer is the state of the function, computed using a simple multiply-accumulate: y(t) = k*exp(p)*y(t-1) + x(t), where k*exp(p) must only be computed once.
 
+Backpropogation is performed by convolving the loss gradients across each transfer function's impulse response backwards, while moving forward through time. The exact details of this process - and the measures that must be taken to prevent the accumulation of numerical error - are lengthy, and will be added here on a future date. For now, see LiNet.backwards in /py/linet.py for the implementation.
+
+In this context, transfer functions are more computationally efficient than kernel-based approaches. Furthermore, since previous inputs are stored in superposition, only the current state of the network must be stored during inference - that is, we don't need to store previous states to re-convolve over them. This mean that LiNet has the exact same time and space inference complexity as a regular feed-forward network.
+
+For convergence, the gains of each transfer function are have the same properties as regular linear weights, and the poles of the transfer function are guarenteed to converge as long as all inputs to the function are positive (formal proof of this not included here). For more generalized inputs, more work must be done to test the convergence properties of transfer function poles.
 
