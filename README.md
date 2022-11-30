@@ -84,7 +84,7 @@ Output:
 
 ![example output signal](./example_images/output_signal.png)
 
-The way that LiNet uses these transfer functions is to replace the regular weight matrix with a matrix of linear transfer functions. In the current PyTorch implementation, this requires three seperate matrices: the gain of each function, the decay value (exp(p) of the function, called gamma in the code), and the state of the function. The output to the next layer is the sum of the state matrix along its rows, with the states computed using a simple linear combination: y[i, j](t) = exp(p)\[i, j\] * y\[i, j\](t-1) + k\[i, j\] * x\[j\](t).
+The way that LiNet uses these transfer functions is to replace the regular weight matrix with a matrix of linear transfer functions. In the current PyTorch implementation, this requires three seperate matrices: the gain of each function, the decay value (exp(p) of the function, called gamma in the code), and the state of the function. The output to the next layer is the sum of the state matrix along its rows, with the states computed using a simple linear combination: y\[i, j\](t) = exp(p)\[i, j\] * y\[i, j\](t-1) + k\[i, j\] * x\[j\](t).
 
 Backpropogation is performed by convolving the loss gradients across each transfer function's impulse response backwards, while moving forward through time. The exact details of this process - and the measures that must be taken to prevent the accumulation of numerical error - are lengthy, and will be added here on a future date. For now, see LiNet.backwards in /py/linet.py for the implementation.
 
