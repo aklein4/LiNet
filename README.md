@@ -74,7 +74,8 @@ Example response function:
 ![example of an exponential decary response function](./example_images/impulse_response.jpg)
 
 Example of signal convolution:
-Input: ![example input signal](./example_images/input signal.png)
+
+Input: ![example input signal]("./example_images/input signal.png")
 
 Output: ![example output signal](./example_images/output_signal.png)
 
