@@ -44,8 +44,9 @@ _image_
 and sinusoidal waves:
 _image_
 
-the mean-squared error (given a sigmoidal activation on the last layer, with a 1 label representing a sinusoid and a 0 representing a polynomial) on both the training sets and the validation sets can be seen converging:
+the mean-squared error (given a sigmoidal activation on the last layer, with a 1 label representing a sinusoid and a 0 representing a polynomial) on both the training sets and the validation sets can be seen converging (note that this graph shows mean MSE loss, not log MSE loss):
 
+![example of loss vs. epoch](./example_images/training_loss.png)
 
 
 
@@ -69,7 +70,13 @@ The single-pole transfer function is the solution to the dynamics equation x' + 
 
 Represented in the s-domain as k/(s-p), the single-pole transfer function represents the convolution of the input signal (often a force or a voltage, but in our case the input to a layer) with an exponential decay response function. It can be shown that through linear combinations of single-poly transfer functions, any arbitrary response function can be achieved. 
 
-Some pictures...
+Example response function:
+![example of an exponential decary response function](./example_images/impulse_response.jpg)
+
+Example of signal convolution:
+Input: ![example input signal](./example_images/input signal.png)
+
+Output: ![example output signal](./example_images/output_signal.png)
 
 With respect to deep learning, transfer functions are more computationally efficient than kernel-based approaches, as the next state of a transfer function can be found using one multiply-accumulate: y(t) = k*exp(p)*y(t-1) + x(t), where k*exp(p) must only be computed once. Furthermore, since previous inputs are stored in superposition, only the current state of the network must be stored during inference - that is, we don't need to store previous states to re-convolve over them. This mean that LiNet has the exact same time and space inference complexity as a regular feed-forward network.
 
