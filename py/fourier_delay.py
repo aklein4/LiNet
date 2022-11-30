@@ -4,6 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
+"""
+This file is used for experimenting with the efficient lossy compression of gradients using fourier transforms.
+"""
+
+
 N_COMPONENTS = 100
 SEQ_LEN = 1000
 DELAY = SEQ_LEN//2
