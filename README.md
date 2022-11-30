@@ -16,11 +16,11 @@ Defines constants and helper functions for the LiNet class and other files.
 
 ### train.py
 
-Defines the train function, which allows the user to plug in an instance of the DataLoader class (also defined in this file) and perform gradient descent with variable batch size. The train function provides both checkpointing and loss-graphing functionality.
+Defines the train function, which allows the user to plug in an instance of the DataLoader class (also defined in this file) and perform gradient descent with variable batch size. The train function also provides checkpointing functionality.
 
 ### main.py
 
-Currently serves as an example of training the network to classify sinusoidal functions from simply polynomial functions, described below.
+Currently serves as an example of training the network to classify sinusoidal functions from 2nd-order polynomial functions, described below.
 
 ## Example
 
@@ -67,7 +67,7 @@ This is obviously a small and simple example, but it shows that the network is a
 
 Linear transfer functions are come from the field of control theory, and are abstractions of real world systems. The most simple transfer function is DC-gain, which only multiplies the input by some constant to get the output (in the context of deep learning, this represents regular 'weights' used in feed-forward networks). The next step up in complexity is what LiNet currently uses: the single-pole transfer function.
 
-The single-pole transfer function is the solution to the dynamics equation x' + ax = F. Systems described by this equation include the charge of a transistor with relation to voltage, and the velocity of an object moving with viscous friction with relation to driving force.
+The single-pole transfer function is the solution to the dynamics equation x' + ax = F. Systems described by this equation include the charge of a transistor with relation to voltage, and the velocity of an object moving through viscous friction with respect to force.
 
 Represented in the s-domain as k/(s-p), the single-pole transfer function represents the convolution of the input signal (often a force or a voltage, but in our case the input to a layer) with an exponential decay response function. It can be shown that through linear combinations of single-pole transfer functions, any arbitrary response function can be achieved. 
 
