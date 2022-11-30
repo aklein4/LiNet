@@ -116,8 +116,8 @@ class LiNet:
         matrix_size = gains[index].size(dim=0), n_inputs
 
         # He initialization on integral and gain
-        integrals = torch.normal(0, math.sqrt(4/n_inputs), matrix_size, dtype=self.dtype, device=self.device)
-        gains[index] = torch.normal(0.0, math.sqrt(1/n_inputs), matrix_size, dtype=self.dtype, device=self.device) # 1 seems to work better for 60fps
+        integrals = torch.normal(0, math.sqrt(1/(MAX_SETTLING_TIME*n_inputs)), matrix_size, dtype=self.dtype, device=self.device)
+        gains[index] = torch.normal(0.0, math.sqrt(1/(MAX_SETTLING_TIME*n_inputs)), matrix_size, dtype=self.dtype, device=self.device) # 1 seems to work better for 60fps
 
         #integrals = torch.subtract(integrals, gains[index])
 
@@ -131,7 +131,7 @@ class LiNet:
 
         # convert the poles to gammas
         gammas[index] = torch.exp(poles)
-        gammas[index] = torch.where(gammas[index].le(0.00001), 0.00001, gammas[index])
+        gammas[index] = torch.where(gammas[index].le(math.exp(INTEGRATOR_LIMIT)), math.exp(INTEGRATOR_LIMIT), gammas[index])
 
 
     def forward(self, phi: torch.Tensor) -> torch.Tensor:

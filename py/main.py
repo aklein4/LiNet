@@ -11,7 +11,7 @@ import numpy.polynomial as poly
 
 
 NUM_STEPS = 64
-LAYER_SIZE = 64
+LAYER_SIZE = 16
 NUM_HIDDEN = 4
 
 N_TRAIN = 64
@@ -25,7 +25,7 @@ def get_random_poly(device):
     poly_tensor = torch.zeros((NUM_STEPS, LAYER_SIZE), device=device)
     p = poly.Polynomial(np.random.randint([-5*NUM_STEPS**2, -5*NUM_STEPS, -5], [5*NUM_STEPS**2, 5*NUM_STEPS, 5], size=(3,)))
     for t in range(NUM_STEPS):
-        poly_tensor[t][:] = p(t)
+        poly_tensor[t][0] = p(t)
 
     poly_tensor /= 5*NUM_STEPS**2
     poly_tensor -= min(0, torch.min(poly_tensor).item())
@@ -44,7 +44,7 @@ def get_random_sin(device):
     A = np.random.random() / 2
     
     for t in range(NUM_STEPS):
-        sin_tensor[t][:] = A*np.sin(w*t + phi)
+        sin_tensor[t][0] = A*np.sin(w*t + phi)
 
     sin_tensor -= min(0, torch.min(sin_tensor).item())
     
@@ -81,7 +81,7 @@ def main(args):
     for poly in val_poly:
         plt.plot(range(poly.shape[0]), poly[:, 0].cpu())
     plt.title("Polynomial Validation Functions")
-    plt.savefig("ply_val.png")
+    plt.savefig("poly_val.png")
 
     plt.clf()
     for sin in val_sin:
@@ -100,7 +100,7 @@ def main(args):
 
     train(
         net, training_data=train_data, validation_data=val_data,
-        learning_rate=1e-1, batch_size=1, plot=True, checkpoint_freq=10,
+        learning_rate=1e-4, batch_size=1, plot=True, checkpoint_freq=None,
         shuffle=True, classifier=True
     )
         
