@@ -46,7 +46,7 @@ and sinusoidal waves:
 
 ![example of sinusoidal validation functions](./example_images/sin_val.png)
 
-the mean-squared error (given a sigmoidal activation on the last layer, with a 1 label representing a sinusoid and a 0 representing a polynomial) on both the training sets and the validation sets can be seen converging (note that this graph shows mean MSE loss, not log MSE loss):
+the mean-squared error (given a sigmoidal activation on the last layer, with a 1 label representing a sinusoid and a 0 representing a polynomial) on both the training sets and the validation sets can be seen converging (note that this graph shows MSE loss, not log MSE loss):
 
 ![example of loss vs. epoch](./example_images/training_loss.png)
 
