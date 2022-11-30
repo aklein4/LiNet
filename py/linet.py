@@ -24,7 +24,7 @@ class LiNet:
 
     def __init__(self, layer_size: int, num_hidden: int, device: torch.device=torch.device("cpu"), dtype: torch.dtype=torch.float32, act_func: str='ReLU', last_activates: bool=True):
         """
-        Initialize an linet recurrent neural network.
+        Initialize a linet recurrent neural network.
         
         :param layer_size: Number of nodes per layer (this currently includes input and output layers TODO: fix this)
         :param num_hidden: Number of hidden layers
