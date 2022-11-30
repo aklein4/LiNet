@@ -39,9 +39,11 @@ and training/data with the following parameters:
  - learning_rate = 1e-4
 
 to classify between 2nd-order polynomials:
+
 ![example of polynomial validation functions](./example_images/poly_val.png)
 
 and sinusoidal waves:
+
 ![example of sinusoidal validation functions](./example_images/sin_val.png)
 
 the mean-squared error (given a sigmoidal activation on the last layer, with a 1 label representing a sinusoid and a 0 representing a polynomial) on both the training sets and the validation sets can be seen converging (note that this graph shows mean MSE loss, not log MSE loss):
@@ -72,11 +74,15 @@ Represented in the s-domain as k/(s-p), the single-pole transfer function repres
 Example response function:
 ![example of an exponential decary response function](./example_images/impulse_response.jpg)
 
-Example of signal convolution:
+### Example of signal convolution:
 
-Input: ![example input signal](./example_images/input_signal.png)
+Input:
 
-Output: ![example output signal](./example_images/output_signal.png)
+![example input signal](./example_images/input_signal.png)
+
+Output:
+
+![example output signal](./example_images/output_signal.png)
 
 With respect to deep learning, transfer functions are more computationally efficient than kernel-based approaches, as the next state of a transfer function can be found using one multiply-accumulate: y(t) = k*exp(p)*y(t-1) + x(t), where k*exp(p) must only be computed once. Furthermore, since previous inputs are stored in superposition, only the current state of the network must be stored during inference - that is, we don't need to store previous states to re-convolve over them. This mean that LiNet has the exact same time and space inference complexity as a regular feed-forward network.
 
