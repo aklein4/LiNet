@@ -4,7 +4,7 @@ LiNet is a neural net architecture that replaces the weights of a standard feed-
 
 ## Information
 
-The CUDA/C++ optimized version of the network is still a work in progress, so all usable code is currently found in the /py folder.
+The CUDA/C++ optimized version of the network is still a work in progress, so all usable code is currently implemented in Python with PyTorch, found in the /py folder.
 
 ### linet.py
 
