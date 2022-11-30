@@ -4,3 +4,4 @@ build/
 .vscode/settings.json
 
 py/__pycache__/
+py/model_checkpoints/

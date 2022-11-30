@@ -1,61 +1,35 @@
 
-import numpy as np
+from linet_helpers import *
+
 import math
 import torch
 
-import time
-import sys
-
-class Timer:
-    def __init__(self):
-        self.start_time = time.time_ns()
-    def reset(self):
-        self.start_time = time.time_ns()
-    def get_time(self):
-        return (time.time_ns() - self.start_time)/1000000
-    def print(self):
-        print((time.time_ns() - self.start_time)/1000000)
-
-ACT_FUNCS = {
-    "identity": torch.nn.Identity(),
-    "relu": torch.nn.ReLU(inplace=True),
-    "elu": torch.nn.ELU(inplace=True)
-}
-DIFF_FUNCS = {
-    "identity": lambda t: torch.full_like(t, 1),
-    "relu": lambda t: torch.where(t.gt(0), 1, 0),
-    "elu": lambda t: torch.where(t.ge(0), 1, torch.exp(t))
-}
-
-MAX_SETTLING_TIME = 60
-DEFAULT_MAX_TAU = 6
+# maximum number of steps before an impulse must decay
+MAX_SETTLING_TIME = 128
+# maximum number of time-constants that are treated as full decay
+DEFAULT_MAX_TAU = 4
+# the maxmimum pole location based on MAX_SETTLING_TIME and DEFAULT_MAX_TAU
 INTEGRATOR_LIMIT = -(1/(MAX_SETTLING_TIME/DEFAULT_MAX_TAU))
+# The maximum gradient that can be applied to avoid divergence
+GRADIENT_CLIP = 1000
 
-def indw(A, i):
-    # evaluate A at wrapped index i
-    if i < 0:
-        return A[A.size(dim=0) - i]
-    if i >= A.size(dim=0):
-        return A[i % A.size(dim=0)]
-    return A[i]
 
-def indw_i(A, i):
-    # get wrapped index i
-    if i < 0:
-        return A.size(dim=0) - i
-    elif i >= A.size(dim=0):
-        return i % A.size(dim=0)
-    return i
+class LiNet:
 
-def indp(A, i):
-    # get 0-padded value of A at i
-    if i >= 0 and i < A.size(dim=0):
-        return A[i]
-    return A[0] * 0
-
-class Ordinet:
-
-    def __init__(self, layer_size, num_hidden, device=torch.device("cpu"), dtype=torch.float32, act_func='ReLU', last_activates=True):
+    def __init__(self, layer_size: int, num_hidden: int, device: torch.device=torch.device("cpu"), dtype: torch.dtype=torch.float32, act_func: str='ReLU', last_activates: bool=True):
+        """
+        Initialize an linet recurrent neural network.
+        
+        :param layer_size: Number of nodes per layer (this currently includes input and output layers TODO: fix this)
+        :param num_hidden: Number of hidden layers
+        :param device: torch.device to operate on (default: CPU)
+        :param dtype: torch.type to use (default: float32)
+        :param act_func: string denoting the activation function to use, see linet_helpers.ACT_FUNCS
+        :param last_activates: Whether to apply the activation function to the output layer (default False TODO: This is currently disabled)
+        """
+        
+        # TODO: fix last_activates
+        last_activates = False
 
         # TODO: Bias activation in every layer
 
@@ -99,18 +73,50 @@ class Ordinet:
         self.forward_hook_ids = set()
         self.forward_hooks = {}
 
-    def _init_layer(self, gains, gammas, index):
-        # mutate gain and gamma values
+        
+    def save(self, gamma_path: str, gain_path: str) -> None:
+        """
+        Load a model checkpoint from a given path.
 
+        :param gamma_path: Path to the gamma tensor checkpoint
+        :param gamma_path: Path to the gain tensor checkpoint
+        """
+        torch.save(self.gains, gain_path)
+        torch.save(self.gammas, gamma_path)
+    
+    def load(self, gamma_path: str, gain_path: str) -> None:
+        """
+        Load a model checkpoint from a given path.
+
+        :param gamma_path: Path to the gamma tensor checkpoint
+        :param gamma_path: Path to the gain tensor checkpoint
+        """
+        self.gains = torch.load(gain_path)
+        self.gammas = torch.load(gamma_path)
+        
+        
+    def _init_layer(self, gains: torch.Tensor, gammas: torch.Tensor, index: int) -> None:
+        """
+        Mutate the given layer of a 3D gain and gamma matrix with initialization values.
+
+        :param gains: 3D tensor representing the gain values
+        :param gammas: 3D tensor representing the gamma values
+        :param index: Which layer of the weights to initializee
+        """
+
+        # check dimensions
         if gains[index].size() != gammas[index].size():
             raise ValueError("Layer initialization has gain and gamma tensor sizes that do not match.")
         if gains[index].dim() != 2:
             raise ValueError("Layer initialization should be done on an indexed 2D layer.")
+        
+        # number of inputs the layer takes
         n_inputs = gains[index].size(dim=1)
+        # tuple representing the size of the weight amtrix
         matrix_size = gains[index].size(dim=0), n_inputs
 
         # He initialization on integral and gain
-        integrals = torch.normal(0.0, math.sqrt(2/n_inputs), matrix_size, dtype=self.dtype, device=self.device)
+        integrals = torch.normal(0, math.sqrt(4/n_inputs), matrix_size, dtype=self.dtype, device=self.device)
         gains[index] = torch.normal(0.0, math.sqrt(1/n_inputs), matrix_size, dtype=self.dtype, device=self.device) # 1 seems to work better for 60fps
 
         #integrals = torch.subtract(integrals, gains[index])
@@ -128,51 +134,108 @@ class Ordinet:
         gammas[index] = torch.where(gammas[index].le(0.00001), 0.00001, gammas[index])
 
 
-    def forward(self, phi: torch.Tensor):
+    def forward(self, phi: torch.Tensor) -> torch.Tensor:
+        """
+        Do a forward pass through the network. Uses abnd modifies the current state of the network.
+
+        :param phi: The input vector to the network
+
+        :return: The output vector of the pass
+        """
+
+        # check dimensionality
         if phi.dim() != 1:
             raise ValueError("Input tensor to forward must be 1 dimensional.")
         if phi.size(dim=0) != self.layer_size:
             raise ValueError("Input tensor to forward is the wrong size.")
         if phi.device != self.device:
-            raise ValueError("Input tensor to forward does not match device with Ordinet.")
+            raise ValueError("Input tensor to forward does not match device with LiNet.")
         if phi.dtype != self.dtype:
-            raise ValueError("Input tensor to forwrd does not math dtype with Ordinet.")
+            raise ValueError("Input tensor to forwrd does not math dtype with LiNet.")
 
+        # make sure we don't modify this
         y = phi.clone()
 
+        # iterate through every layer
         for b in range(self.container_size[0]):
+
+            # convolve weights
             self.activations[b] = torch.mul(self.activations[b], self.gammas[b])
             self.activations[b] = torch.add(self.activations[b], torch.mul(self.gains[b], torch.t(y)))
 
+            # sum weights into next layer
             y = torch.sum(self.activations[b], dim=1)
+
+            # apply activation function
             if b != self.container_size[0]-1 or self.last_activates:
                 y = self.act_func(y)
 
+            # store to hook for debugging
             if b in self.forward_hook_ids:
                 self.forward_hooks[b] = y.clone()
 
+        # output of final layer is return value
         return y
 
-    def create_forward_hook(self, i: int):
+    
+    def reset(self):
+        """
+        Reset the state of the recurrent network. This must be dont between independent forward passes.
+        """
+        self.activations = torch.zeros(self.container_size, dtype=self.dtype, device=self.device)
+
+    
+    def create_forward_hook(self, i: int) -> None:
+        """
+        Add an index to the list of layers that store a forward hook.
+
+        :param i: Index of the layer to create a hook for
+        """
         if i not in self.forward_hook_ids:
+            # add i to dict
             self.forward_hook_ids.add(i)
             self.forward_hooks[i] = None
 
     def remove_forward_hook(self, i: int):
+        """
+        Remove an index to the list of layers that store a forward hook.
+        (Does nothing if i is not a hook)
+
+        :param i: Index of the layer remove
+        """
         if i in self.forward_hook_ids:
+            # remove from dict
             self.forward_hook_ids.remove(i)
             self.forward_hooks.pop(i)
 
-    def get_forward_hook(self, i: int):
+    def get_forward_hook(self, i: int) -> torch.Tensor:
+        """
+        Get the value of the forward hook at index i, if it is stored. Returns None of the hook has not been set.
+
+        :param i: Index of the layer to get.
+
+        :return: The previous value of that layer.
+        """
         if i not in self.forward_hook_ids:
+            # check that this is a valid hook
             raise ValueError("Indexed invalid forward hook.")
         return self.forward_hooks[i]
 
-    def reset(self):
-        self.activations = torch.zeros(self.container_size, dtype=self.dtype, device=self.device)
 
+    def backward(self, x_sequence: torch.Tensor, loss_gradients: torch.Tensor, max_tau: int=DEFAULT_MAX_TAU, d_offset: float=0.99, lr=None, momentum=0.0) -> None:
+        """
+        Perform Backpropogration-Forward-Through-Time on a sequence of inputs and loss gradients.
+        Note that loss must be input as the gradient, rather than the actual loss.
 
-    def backward(self, x_sequence, loss_gradients, max_tau=DEFAULT_MAX_TAU, d_offset = 0.99, lr=None, momentum=0.0):
+        :param x_sequence: 3D tensor with the first axis as time representing the input data.
+        :param loss_gradients: 3D tensor with the first axis as tiem representing the loss gradients to minimize.
+        :param max_tau: The number of time constants to treat as decay (default MAX_TAU)
+        :param d_offset: The offset of the second pole, as a percentage, when calculating pole gradients. (default 0.99)
+        :param lr: The learning rate to use for in-sequence stochastic gradient descent (not fully implemented and might cause problems, default None)
+        :param momentum: The momentum (simple discounted momentum, defualt 0)
+        """
+
+        # check dimensions
         if x_sequence.size(dim=0) != loss_gradients.size(dim=0):
             raise ValueError("x_sequence and loss_gradients sizes do not match on temporal dimension")
         if x_sequence.size(dim=1) != self.layer_size:
@@ -180,13 +243,16 @@ class Ordinet:
         if loss_gradients.size(dim=1) != self.layer_size:
             raise ValueError("loss_gradients has wrong output size.")
         if x_sequence.device != self.device:
-            raise ValueError("x_sequence tensor does not match device with Ordinet.")
+            raise ValueError("x_sequence tensor does not match device with LiNet.")
         if loss_gradients.device != self.device:
-            raise ValueError("loss_gradients tensor does not match device with Ordinet.")
+            raise ValueError("loss_gradients tensor does not match device with LiNet.")
         if x_sequence.dtype != self.dtype:
-            raise ValueError("x_sequence tensor does not match device with Ordinet.")
+            raise ValueError("x_sequence tensor does not match device with LiNet.")
         if loss_gradients.dtype != self.dtype:
-            raise ValueError("loss_gradients tensor does not match device with Ordinet.")
+            raise ValueError("loss_gradients tensor does not match device with LiNet.")
+
+        # reset to clear any previous passes
+        self.reset()
 
         # the length of the sequence we are training on
         sequence_length = x_sequence.size(dim=0)
@@ -296,9 +362,10 @@ class Ordinet:
                     # update the gradients with chain rule
                     self.gain_grads[l] += torch.mul(torch.divide(trailing_activations[l], self.gains[l]), curr_loss[:, None])
                     self.pole_grads[l] += torch.mul(torch.div(torch.sub(offset_activations[l], trailing_activations[l]), offset_coefs[l]), torch.t(curr_loss))
-                    
+
                     if lr != None:
-                        self.apply_grads(lr, momentum=momentum)
+                        self.gains[l] += lr*self.gain_grads[l]
+                        self.gain_grads[l] *= momentum
 
                 """ Second we update and save the transfer function's loss convolution """
 
@@ -380,14 +447,30 @@ class Ordinet:
                         input_trails[b+1][indw_i(input_trails[b+1], t)] = input_leader.clone() # overwrites the last input that was read
                         
 
-    def apply_grads(self, lr_k, lr_p=None, momentum=0.0):
+    def apply_grads(self, lr_k, lr_p=None, momentum=0.0) -> None:
+        """
+        Apply the gradients stored in the network to its weights.
+
+        :param lr_k: learning rate of teh gains
+        :param lr_p: learning rate of the poles (None if same as lr_k, default None)
+        :param momentum: Amount of momentum to store for next time
+        """
+
+        # configure lr_p
         if lr_p == None:
             lr_p = lr_k
 
+        # apply gradient clipping
+        self.gain_grads = torch.where(torch.gt(self.gain_grads, GRADIENT_CLIP), GRADIENT_CLIP, self.gain_grads)
+        self.gain_grads = torch.where(torch.lt(self.gain_grads, -GRADIENT_CLIP), -GRADIENT_CLIP, self.gain_grads)
+        self.pole_grads = torch.where(torch.gt(self.pole_grads, GRADIENT_CLIP), GRADIENT_CLIP, self.pole_grads)
+        self.pole_grads = torch.where(torch.lt(self.pole_grads, -GRADIENT_CLIP), -GRADIENT_CLIP, self.pole_grads)
+
+        # update weights
         self.gains += lr_k*self.gain_grads
         self.gain_grads *= momentum
 
-        # calculate the poles for each gamma
+        # calculate the poles for each gamma and update
         poles = torch.log(self.gammas)
         poles += lr_p*self.pole_grads
         self.gammas = torch.exp(torch.minimum(poles, torch.full_like(poles, INTEGRATOR_LIMIT)))
@@ -395,6 +478,14 @@ class Ordinet:
 
 
     def debug_backward(self, x_sequence, loss_gradients, layer_num):
+        """
+        Use a slow simplified version of backpropogation at a specific layer to check that the real version is worling correctly.
+
+        :param x_sequence: 3D tensor with the first axis as time representing the input data.
+        :param loss_gradients: 3D tensor with the first axis as tiem representing the loss gradients to minimize.
+        """
+
+        # check dimensions
         if x_sequence.size(dim=0) != loss_gradients.size(dim=0):
             raise ValueError("x_sequence and loss_gradients sizes do not match on temporal dimension")
         if x_sequence.size(dim=1) != self.layer_size:
@@ -402,58 +493,67 @@ class Ordinet:
         if loss_gradients.size(dim=1) != self.layer_size:
             raise ValueError("loss_gradients has wrong output size.")
         if x_sequence.device != self.device:
-            raise ValueError("x_sequence tensor does not match device with Ordinet.")
+            raise ValueError("x_sequence tensor does not match device with LiNet.")
         if loss_gradients.device != self.device:
-            raise ValueError("loss_gradients tensor does not match device with Ordinet.")
+            raise ValueError("loss_gradients tensor does not match device with LiNet.")
         if x_sequence.dtype != self.dtype:
-            raise ValueError("x_sequence tensor does not match device with Ordinet.")
+            raise ValueError("x_sequence tensor does not match device with LiNet.")
         if loss_gradients.dtype != self.dtype:
-            raise ValueError("loss_gradients tensor does not match device with Ordinet.")
+            raise ValueError("loss_gradients tensor does not match device with LiNet.")
         if layer_num < 0 or layer_num >= self.container_size[0]:
             raise ValueError("invalid debug layer.")
 
         # the length of the sequence we are training on
         sequence_length = x_sequence.size(dim=0)
 
-        # initialize the leading net activations
-        leading_activations = torch.zeros(self.container_size, dtype=self.dtype, device=self.device)
+        curr_loss_seq = [loss_gradients[i] for i in range(loss_gradients.size(dim=0))]
 
-        # keep track of the input sequence for the selected layer
-        input_sequence = []
+        for l in range(self.container_size[0]-1, layer_num-1, -1):
 
-        for t in range(sequence_length):
-                
-            # get the input at t
-            input_leader = x_sequence[t].clone()
+            # initialize the leading net activations
+            leading_activations = torch.zeros(self.container_size, dtype=self.dtype, device=self.device)
 
-            if layer_num == 0:
-                input_sequence.append(input_leader)
+            # keep track of the input sequence for the selected layer
+            input_sequence = []
 
+            for t in range(sequence_length):
+                    
+                # get the input at t
+                input_leader = x_sequence[t].clone()
+
+                if l == 0:
+                    input_sequence.append(input_leader)
+
+                else:
+
+                    # do a forward pass
+                    for b in range(self.container_size[0]):
+                        leading_activations[b] = torch.mul(leading_activations[b], self.gammas[b])
+                        multed_leader = torch.mul(self.gains[b], torch.t(input_leader))
+                        leading_activations[b] = torch.add(leading_activations[b], multed_leader)
+
+                        input_leader = torch.sum(leading_activations[b], dim=1)
+                        input_leader = self.act_func(input_leader)
+                    
+                        if b == l - 1:
+                            input_sequence.append(input_leader)
+                            break
+            
+            # keep track of the backward loss convolutions
+            loss_convolutions = torch.zeros_like(self.gammas[l])
+
+            loss_sequence = []
+
+            for t in range(sequence_length-1, -1, -1):
+                loss_convolutions *= self.gammas[l]
+                loss_convolutions += torch.mul(curr_loss_seq[t][:, None], self.gains[l])
+
+                loss_step = torch.sum(loss_convolutions, dim=0)
+                loss_step *= self.act_grad_func(input_sequence[t])
+                loss_sequence.append(loss_step)
+            
+            if l == layer_num:
+                return loss_sequence[::-1]
             else:
+                curr_loss_seq = loss_sequence[::-1]
 
-                # do a forward pass
-                for b in range(self.container_size[0]):
-                    leading_activations[b] = torch.mul(leading_activations[b], self.gammas[b])
-                    multed_leader = torch.mul(self.gains[b], torch.t(input_leader))
-                    leading_activations[b] = torch.add(leading_activations[b], multed_leader)
-
-                    input_leader = torch.sum(leading_activations[b], dim=1)
-                    input_leader = self.act_func(input_leader)
-                
-                    if b == layer_num - 1:
-                        input_sequence.append(input_leader)
-        
-        # keep track of the backward loss convolutions
-        loss_convolutions = torch.zeros_like(self.gammas[layer_num])
-
-        loss_sequence = []
-
-        for t in range(sequence_length-1, -1, -1):
-            loss_convolutions *= self.gammas[layer_num]
-            loss_convolutions += torch.mul(loss_gradients[t][:, None], self.gains[layer_num])
-
-            loss_step = torch.sum(loss_convolutions, dim=0)
-            loss_step *= self.act_grad_func(input_sequence[t])
-            loss_sequence.append(loss_step)
-        
-        return loss_sequence[::-1]
