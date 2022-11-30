@@ -4,6 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
+
+"""
+This file is used for experimenting with the efficient lossy compression of gradients using transfer functions.
+"""
+
+
 N_COMPONENTS = 5
 SEQ_LEN = 10
 DELAY = 5

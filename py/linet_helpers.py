@@ -2,6 +2,11 @@
 import torch
 import time
 
+"""
+Helper constants and functions for LiNet and related functions.
+"""
+
+
 class Timer:
     # a simple timer class to do my bidding
     def __init__(self):

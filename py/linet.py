@@ -4,6 +4,12 @@ from linet_helpers import *
 import math
 import torch
 
+
+"""
+Implementation of the LiNet class and its methods.
+"""
+
+
 # maximum number of steps before an impulse must decay
 MAX_SETTLING_TIME = 128
 # maximum number of time-constants that are treated as full decay
