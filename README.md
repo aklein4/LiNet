@@ -1,6 +1,6 @@
 # LiNet
 
-LiNet is a neural net architecture that replaces the weights of a standard feed-forward network with linear transfer functions. This allows the network to efficiently operate on online time-series data more efficiently than existing convolutional approaches, and train more efficiently than existing recurrent approaches.
+LiNet is a neural net architecture that replaces the weights of a standard feed-forward network with linear transfer functions. This allows the network to operate on online time-series data more efficiently than existing convolutional approaches, and train more efficiently than existing recurrent approaches.
 
 ## Information
 
@@ -90,5 +90,5 @@ Backpropogation is performed by convolving the loss gradients across each transf
 
 In this context, transfer functions are more computationally efficient than kernel-based approaches. Furthermore, since previous inputs are stored in superposition, only the current state of the network must be stored during inference - that is, we don't need to store previous states to re-convolve over them. This mean that LiNet has the exact same time and space inference complexity as a regular feed-forward network.
 
-For convergence, the gains of each transfer function are have the same properties as regular linear weights, and the poles of the transfer function are guarenteed to converge as long as all inputs to the function are positive (formal proof of this not included here). For more generalized inputs, more work must be done to test the convergence properties of transfer function poles.
+For convergence, the gains of each transfer function are have the same properties as regular linear weights, and the poles of the transfer function are guarenteed to have a convex loss function as long as all inputs to the transfer function are positive (formal proof not included here). For more generalized inputs, more work must be done to test the convergence properties of transfer function poles.
 
