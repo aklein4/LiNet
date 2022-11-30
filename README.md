@@ -39,16 +39,14 @@ and training/data with the following parameters:
  - learning_rate = 1e-4
 
 to classify between 2nd-order polynomials:
-_image_
+![example of polynomial validation functions](./example_images/poly_val.png)
 
 and sinusoidal waves:
-_image_
+![example of sinusoidal validation functions](./example_images/sin_val.png)
 
 the mean-squared error (given a sigmoidal activation on the last layer, with a 1 label representing a sinusoid and a 0 representing a polynomial) on both the training sets and the validation sets can be seen converging (note that this graph shows mean MSE loss, not log MSE loss):
 
 ![example of loss vs. epoch](./example_images/training_loss.png)
-
-
 
 This is obviously a small and simple example, but it shows that the network is able to learn non-arbitrary tasks. As progress continues I hope to create a much more impressive example. 
  
@@ -61,6 +59,7 @@ This is obviously a small and simple example, but it shows that the network is a
  5. Modularize the network to allow more configurable layer sizes, activation functions, and mix in other types of layers.
  6. Use imaginary axis to implement double-pole transfer functions.
  7. Add feedback/long-term-memory connections to generalize away from feed-forward convolution.
+
 
 ## Theory
 
@@ -75,7 +74,7 @@ Example response function:
 
 Example of signal convolution:
 
-Input: ![example input signal]("./example_images/input signal.png")
+Input: ![example input signal](./example_images/input_signal.png)
 
 Output: ![example output signal](./example_images/output_signal.png)
 
